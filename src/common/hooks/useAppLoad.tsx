@@ -4,7 +4,7 @@ type AppLoadProps = {
   isProgressStartAutomatically?: boolean;
   incrementProgressValue?: number;
   /**
-   * setIntervalue value i.e. to update the progress value after each interval
+   * setInterval value i.e. to update the progress value after each interval
    */
   progressInterval?: number;
   /**
@@ -124,5 +124,14 @@ export default function useAppLoad(props?: AppLoadProps) {
     }
   }, [isManualProgressCompleted, onProgressCompleted]);
 
-  return { progress, isLoaded, start, pause, resume, done, loadingStatus, setStoppedProgressValue };
+  const reset = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
+    setProgress(0);
+    setIsLoaded(false);
+    setLoadingStatus("idle");
+  }, []);
+
+  return { progress, isLoaded, start, pause, resume, done, reset, loadingStatus, setStoppedProgressValue };
 }
