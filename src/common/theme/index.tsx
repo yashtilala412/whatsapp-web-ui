@@ -10,12 +10,14 @@ type Theme = {
   mode: ThemeMode;
   onChangeThemeMode: () => void;
   addCustomTheme: (name: string, theme: DefaultTheme) => void;
+  resetToSystemDefaultTheme: () => void;
 };
 
 const AppThemeContext = createContext<Theme>({
   mode: "dark",
   onChangeThemeMode: () => {},
   addCustomTheme: () => {},
+  resetToSystemDefaultTheme: () => {},
 });
 
 type CustomThemes = {
@@ -57,8 +59,14 @@ function AppThemeProvider(props: { children: ReactNode }) {
     }));
   }
 
+  function resetToSystemDefaultTheme() {
+    const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    setThemeMode(systemTheme);
+    window.localStorage.removeItem("theme");
+  }
+
   return (
-    <AppThemeContext.Provider value={{ mode: themeMode, onChangeThemeMode: handleChangeThemeMode, addCustomTheme }}>
+    <AppThemeContext.Provider value={{ mode: themeMode, onChangeThemeMode: handleChangeThemeMode, addCustomTheme, resetToSystemDefaultTheme }}>
       <ThemeProvider theme={getTheme()}>{children}</ThemeProvider>
     </AppThemeContext.Provider>
   );
