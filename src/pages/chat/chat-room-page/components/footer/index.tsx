@@ -27,10 +27,11 @@ export default function Footer() {
         <AttachButton onClick={() => setShowIcons(!showIcons)}>
           <Icon id="attach" className="icon" />
         </AttachButton>
-        <ButtonsContainer>
+        <ButtonsContainer showIcon={showIcons}>
           {attachButtons.map((btn) => (
-            <Button showIcon={showIcons} key={btn.label}>
+            <Button key={btn.label}>
               <Icon id={btn.icon} />
+              <span>{btn.label}</span>
             </Button>
           ))}
         </ButtonsContainer>

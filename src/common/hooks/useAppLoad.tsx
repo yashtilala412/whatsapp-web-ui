@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 type AppLoadProps = {
   isProgressStartAutomatically?: boolean;
@@ -14,13 +14,19 @@ type AppLoadProps = {
   /**
    * At which progress value we want to stop the progress
    */
-  stoppedProgressValue?: number;
+  initialStoppedProgressValue?: number;
   /**
    * if true then it will automatically complete the progress after 'successLoadedTimeout'
    * otherwise we have to manually call done()
    */
   isManualProgressCompleted?: boolean;
+  /**
+   * Callback function when progress is completed
+   */
+  onProgressCompleted?: () => void;
 };
+
+type LoadingStatus = "idle" | "loading" | "paused" | "completed";
 
 export default function useAppLoad(props?: AppLoadProps) {
   const {
@@ -28,34 +34,39 @@ export default function useAppLoad(props?: AppLoadProps) {
     progressInterval = 500,
     incrementProgressValue = 10,
     successLoadedTimeout = 3000,
-    stoppedProgressValue = 70,
+    initialStoppedProgressValue = 70,
     isManualProgressCompleted = true,
+    onProgressCompleted,
   } = props ?? {};
 
   const [progress, setProgress] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState<LoadingStatus>("idle");
+  const [stoppedProgressValue, setStoppedProgressValue] = useState(initialStoppedProgressValue);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    let interval: any;
     if (isProgressStartAutomatically) {
-      interval = _initiateProgress();
+      start();
     }
 
     return () => {
-      if (interval) {
-        clearInterval(interval);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
       }
     };
-
-    // eslint-disable-next-line
-  }, []);
+  }, [isProgressStartAutomatically]);
 
   useEffect(() => {
-    let timeout: any;
+    let timeout: NodeJS.Timeout | null = null;
     if (progress >= stoppedProgressValue && isManualProgressCompleted) {
       timeout = setTimeout(() => {
         setIsLoaded(true);
         setProgress(100);
+        setLoadingStatus("completed");
+        if (onProgressCompleted) {
+          onProgressCompleted();
+        }
       }, successLoadedTimeout);
     }
 
@@ -64,31 +75,54 @@ export default function useAppLoad(props?: AppLoadProps) {
         clearTimeout(timeout);
       }
     };
-  }, [progress, stoppedProgressValue, isManualProgressCompleted, successLoadedTimeout]);
+  }, [progress, stoppedProgressValue, isManualProgressCompleted, successLoadedTimeout, onProgressCompleted]);
 
-  const _initiateProgress = () => {
-    const interval = setInterval(() => {
+  const _initiateProgress = useCallback(() => {
+    setLoadingStatus("loading");
+    intervalRef.current = setInterval(() => {
       setProgress((prev) => {
         if (prev >= stoppedProgressValue) {
-          clearInterval(interval);
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+          }
+          setLoadingStatus("paused");
+          return prev;
         }
 
         return prev + incrementProgressValue;
       });
     }, progressInterval);
+  }, [incrementProgressValue, progressInterval, stoppedProgressValue]);
 
-    return interval;
-  };
+  const start = useCallback(() => {
+    if (loadingStatus === "paused" || loadingStatus === "idle") {
+      _initiateProgress();
+    }
+  }, [loadingStatus, _initiateProgress]);
 
-  const start = () => {
-    _initiateProgress();
-  };
+  const pause = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      setLoadingStatus("paused");
+    }
+  }, []);
 
-  const done = () => {
+  const resume = useCallback(() => {
+    if (loadingStatus === "paused") {
+      _initiateProgress();
+    }
+  }, [loadingStatus, _initiateProgress]);
+
+  const done = useCallback(() => {
     if (!isManualProgressCompleted) {
       setIsLoaded(true);
+      setProgress(100);
+      setLoadingStatus("completed");
+      if (onProgressCompleted) {
+        onProgressCompleted();
+      }
     }
-  };
+  }, [isManualProgressCompleted, onProgressCompleted]);
 
-  return { progress, isLoaded, start, done };
+  return { progress, isLoaded, start, pause, resume, done, loadingStatus, setStoppedProgressValue };
 }
